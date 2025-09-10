@@ -1,6 +1,6 @@
 package com.example.WebSocket.controller;
 
-import com.example.WebSocket.model.MessageDto;
+import com.example.WebSocket.dto.MessageDto;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.handler.annotation.SendTo;

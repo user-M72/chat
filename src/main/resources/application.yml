@@ -1,0 +1,25 @@
+spring:
+  application:
+  name: WebSocket
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/chatDb
+    username: postgres
+    password: 01032002ama
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      # PAY ATTENTION, BE CAUTIOUS!!!
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+server:
+  port: 8080
+  ssl:
+    enabled: true
+    key-store: classpath:keystore.p12
+    key-store-password: test
+    key-store-type: PKCS12
