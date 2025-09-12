@@ -1,144 +1,252 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WebSocket Chat</title>
-    <script src="https://cdn.jsdelivr.net/npm/sockjs-client/dist/sockjs.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/stompjs/lib/stomp.min.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Application</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            background: #f3f4f6;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-        }
-        .chat-container {
-            background: white;
-            width: 400px;
-            max-width: 90%;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-        .chat-header {
-            background: #2563eb;
-            color: white;
-            padding: 15px;
-            text-align: center;
-            font-weight: bold;
-            font-size: 18px;
-        }
-        .chat-messages {
-            flex: 1;
-            padding: 15px;
-            overflow-y: auto;
-            list-style: none;
-            margin: 0;
-        }
-        .chat-messages li {
-            margin-bottom: 10px;
-            padding: 8px 12px;
-            border-radius: 10px;
-            max-width: 80%;
-            word-wrap: break-word;
-        }
-        .chat-messages .own {
-            background: #dbeafe;
-            align-self: flex-end;
-            margin-left: auto;
-        }
-        .chat-messages .other {
-            background: #f1f5f9;
-            align-self: flex-start;
-        }
-        .chat-input {
-            display: flex;
-            border-top: 1px solid #e5e7eb;
-        }
-        .chat-input input {
-            border: none;
-            padding: 12px;
-            flex: 1;
-            outline: none;
-            font-size: 14px;
-        }
-        .chat-input button {
-            background: #2563eb;
-            color: white;
-            border: none;
-            padding: 12px 18px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: background 0.2s;
-        }
-        .chat-input button:hover {
-            background: #1e40af;
-        }
+        body { font-family: Arial, sans-serif; margin:0; height:100vh; display:flex; }
+        .user-form { margin:auto; text-align:center; }
+        .user-form input { display:block; margin:10px auto; padding:8px; width:200px; }
+        .user-form button { padding:8px 15px; cursor:pointer; }
+
+        .hidden { display:none !important; }
+
+        .chat-container { flex:1; display:flex; }
+        .users-list { width:250px; background:#f8f9fa; border-right:1px solid #e5e7eb; display:flex; flex-direction:column; justify-content:space-between; }
+        .users-list-container { flex:1; overflow-y:auto; }
+        .users-list h2 { margin:0; padding:12px; background:#2563eb; color:white; font-size:16px; }
+        .users-list ul { margin:0; padding:0; list-style:none; }
+        .users-list li { padding:10px; cursor:pointer; display:flex; align-items:center; border-bottom:1px solid #e5e7eb; }
+        .users-list li.active { background:#e0e7ff; font-weight:bold; }
+        .users-list img { width:28px; height:28px; margin-right:10px; }
+        .nbr-msg { background:red; color:white; border-radius:50%; padding:2px 6px; font-size:12px; margin-left:auto; }
+        .separator { height:1px; background:#e5e7eb; margin:0 5px; }
+
+        .chat-area { flex:1; display:flex; flex-direction:column; }
+        #chat-messages { flex:1; padding:15px; overflow-y:auto; display:flex; flex-direction:column; }
+        .message { margin-bottom:10px; padding:8px 12px; border-radius:10px; max-width:70%; word-wrap:break-word; }
+        .message.sender { background:#d1fae5; align-self:flex-end; }
+        .message.receiver { background:#f1f5f9; align-self:flex-start; }
+
+        .message-input { display:flex; border-top:1px solid #e5e7eb; }
+        .message-input input { border:none; padding:12px; flex:1; outline:none; font-size:14px; }
+        .message-input button { background:#2563eb; color:white; border:none; padding:12px 18px; cursor:pointer; font-size:14px; }
+
+        .logout { display:block; padding:10px; text-align:center; color:#2563eb; text-decoration:none; font-weight:bold; }
+        .logout:hover { text-decoration:underline; }
+
+        h2.header { position:absolute; top:0; left:0; width:100%; text-align:center; background:#2563eb; color:white; margin:0; padding:10px; }
     </style>
 </head>
 <body>
-<div class="chat-container">
-    <div class="chat-header">💬 WebSocket Chat</div>
-    <ul id="messages" class="chat-messages"></ul>
-    <div class="chat-input">
-        <input id="from" placeholder="Ваше имя">
-        <input id="text" placeholder="Сообщение" onkeypress="if(event.key==='Enter') sendMessage()">
-        <button onclick="sendMessage()">➤</button>
+
+<h2 class="header">One to One Chat | Spring Boot & WebSocket</h2>
+
+<!-- Login Form -->
+<div class="user-form" id="username-page">
+    <h2>Enter Chatroom</h2>
+    <form id="usernameForm">
+        <label for="nickname">Nickname:</label>
+        <input type="text" id="nickname" name="nickname" required>
+        <label for="fullname">Full Name:</label>
+        <input type="text" id="fullname" name="fullname" required>
+        <button type="submit">Enter Chatroom</button>
+    </form>
+</div>
+
+<!-- Chat Page -->
+<div class="chat-container hidden" id="chat-page">
+    <div class="users-list">
+        <div class="users-list-container">
+            <h2>Online Users</h2>
+            <ul id="connectedUsers"></ul>
+        </div>
+        <div>
+            <p id="connected-user-fullname"></p>
+            <a class="logout" href="javascript:void(0)" id="logout">Logout</a>
+        </div>
+    </div>
+
+    <div class="chat-area">
+        <div id="chat-messages"></div>
+        <form id="messageForm" name="messageForm" class="hidden">
+            <div class="message-input">
+                <input autocomplete="off" type="text" id="message" placeholder="Type your message...">
+                <button>Send</button>
+            </div>
+        </form>
     </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.1.4/sockjs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+
 <script>
+    'use strict';
+
+    const usernamePage = document.querySelector('#username-page');
+    const chatPage = document.querySelector('#chat-page');
+    const usernameForm = document.querySelector('#usernameForm');
+    const messageForm = document.querySelector('#messageForm');
+    const messageInput = document.querySelector('#message');
+    const chatArea = document.querySelector('#chat-messages');
+    const logout = document.querySelector('#logout');
+
     let stompClient = null;
-    let username = "";
+    let nickname = null;
+    let fullname = null;
+    let selectedUserId = null;
 
-    function connect() {
-        let socket = new SockJS('/ws');
-        stompClient = Stomp.over(socket);
+    // Connect to WebSocket
+    function connect(event) {
+        nickname = document.querySelector('#nickname').value.trim();
+        fullname = document.querySelector('#fullname').value.trim();
 
-        stompClient.connect({}, function () {
-            console.log("✅ Connected to WebSocket");
+        if (nickname && fullname) {
+            usernamePage.classList.add('hidden');
+            chatPage.classList.remove('hidden');
 
-            stompClient.subscribe('/topic/message', function (message) {
-                let msg = JSON.parse(message.body);
-                console.log("📩 Получено:", msg);
+            const socket = new SockJS('/ws');
+            stompClient = Stomp.over(socket);
+            stompClient.connect({}, onConnected, onError);
+        }
+        event.preventDefault();
+    }
 
-                let li = document.createElement("li");
-                li.textContent = msg.from + ": " + msg.text;
+    function onConnected() {
+        // Subscribe to personal and public messages
+        stompClient.subscribe(`/user/${nickname}/queue/messages`, onMessageReceived);
+        stompClient.subscribe(`/user/public`, onMessageReceived);
 
-                if (msg.from === username) {
-                    li.classList.add("own");
-                } else {
-                    li.classList.add("other");
-                }
+        // Notify server about new user
+        stompClient.send("/app/user.addUser", {}, JSON.stringify({nickname: nickname, fullName: fullname, status: 'ONLINE'}));
 
-                document.getElementById("messages").appendChild(li);
-                li.scrollIntoView({behavior: "smooth"});
-            });
+        document.querySelector('#connected-user-fullname').textContent = fullname;
+        findAndDisplayConnectedUsers();
+    }
+
+    // Fetch connected users
+    async function findAndDisplayConnectedUsers() {
+        const response = await fetch('/users');
+        let connectedUsers = await response.json();
+        connectedUsers = connectedUsers.filter(user => user.nickname !== nickname);
+
+        const list = document.getElementById('connectedUsers');
+        list.innerHTML = '';
+
+        connectedUsers.forEach((user, index) => {
+            const li = document.createElement('li');
+            li.classList.add('user-item');
+            li.id = user.nickname;
+
+            const img = document.createElement('img');
+            img.src = '../img/user_icon.png';
+            img.alt = user.fullName;
+
+            const spanName = document.createElement('span');
+            spanName.textContent = user.fullName;
+
+            const nbrMsg = document.createElement('span');
+            nbrMsg.textContent = '0';
+            nbrMsg.classList.add('nbr-msg', 'hidden');
+
+            li.appendChild(img);
+            li.appendChild(spanName);
+            li.appendChild(nbrMsg);
+
+            li.addEventListener('click', userItemClick);
+            list.appendChild(li);
+
+            if (index < connectedUsers.length - 1) {
+                const separator = document.createElement('li');
+                separator.classList.add('separator');
+                list.appendChild(separator);
+            }
         });
     }
 
-    function sendMessage() {
-        if (!username) {
-            username = document.getElementById("from").value.trim();
-            if (!username) {
-                alert("Введите имя!");
-                return;
-            }
-        }
-        let text = document.getElementById("text").value.trim();
-        if (text === "") return;
+    // Click on user to chat
+    function userItemClick(event) {
+        document.querySelectorAll('.user-item').forEach(item => item.classList.remove('active'));
+        messageForm.classList.remove('hidden');
 
-        stompClient.send("/app/chat", {}, JSON.stringify({'from': username, 'text': text}));
-        document.getElementById("text").value = "";
+        const clicked = event.currentTarget;
+        clicked.classList.add('active');
+        selectedUserId = clicked.id;
+        fetchAndDisplayUserChat();
+
+        const nbrMsg = clicked.querySelector('.nbr-msg');
+        nbrMsg.classList.add('hidden');
+        nbrMsg.textContent = '0';
     }
 
-    connect();
+    // Display chat messages
+    function displayMessage(senderId, content) {
+        const messageContainer = document.createElement('div');
+        messageContainer.classList.add('message');
+        if (senderId === nickname) messageContainer.classList.add('sender');
+        else messageContainer.classList.add('receiver');
+
+        const p = document.createElement('p');
+        p.textContent = content;
+        messageContainer.appendChild(p);
+        chatArea.appendChild(messageContainer);
+        chatArea.scrollTop = chatArea.scrollHeight;
+    }
+
+    // Fetch chat history
+    async function fetchAndDisplayUserChat() {
+        const response = await fetch(`/messages/${nickname}/${selectedUserId}`);
+        const messages = await response.json();
+        chatArea.innerHTML = '';
+        messages.forEach(msg => displayMessage(msg.senderId, msg.content));
+    }
+
+    // Receive messages
+    function onMessageReceived(payload) {
+        const message = JSON.parse(payload.body);
+        findAndDisplayConnectedUsers();
+
+        if (selectedUserId && selectedUserId === message.senderId) {
+            displayMessage(message.senderId, message.content);
+        } else {
+            const notifiedUser = document.querySelector(`#${message.senderId}`);
+            if (notifiedUser) {
+                const nbrMsg = notifiedUser.querySelector('.nbr-msg');
+                nbrMsg.classList.remove('hidden');
+                nbrMsg.textContent = '1';
+            }
+        }
+    }
+
+    // Send message
+    function sendMessage(event) {
+        const content = messageInput.value.trim();
+        if (content && stompClient) {
+            const chatMessage = {senderId: nickname, recipientId: selectedUserId, content: content, timestamp: new Date()};
+            stompClient.send("/app/chat", {}, JSON.stringify(chatMessage));
+            displayMessage(nickname, content);
+            messageInput.value = '';
+        }
+        event.preventDefault();
+    }
+
+    // Logout
+    function onLogout() {
+        stompClient.send("/app/user.disconnectUser", {}, JSON.stringify({nickname: nickname, fullName: fullname, status: 'OFFLINE'}));
+        window.location.reload();
+    }
+
+    usernameForm.addEventListener('submit', connect, true);
+    messageForm.addEventListener('submit', sendMessage, true);
+    logout.addEventListener('click', onLogout, true);
+    window.onbeforeunload = () => onLogout();
+
+    function onError() {
+        alert('Could not connect to WebSocket server. Please refresh the page!');
+    }
 </script>
+
 </body>
 </html>

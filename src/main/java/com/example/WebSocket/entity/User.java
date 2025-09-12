@@ -1,19 +1,17 @@
 package com.example.WebSocket.entity;
 
-import com.example.WebSocket.entity.base.BaseDomain;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
+import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
-
-import java.util.UUID;
 
 @Entity(name = "users")
 @Getter
 @Setter
-public class UserEntity extends BaseDomain<UUID> {
+public class User {
 
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
     private String nickname;
     private String fullName;
 
