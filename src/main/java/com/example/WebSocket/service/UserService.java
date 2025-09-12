@@ -20,11 +20,11 @@ public class UserService {
     }
 
     public void disconnect(User user) {
-        userRepository.findByNickname(user.getNickname())
-                .ifPresent(storedUser -> {
-                    storedUser.setStatus(Status.OFFLINE);
-                    userRepository.save(storedUser);
-                });
+        var storedUser = userRepository.findById(user.getNickname()).orElse(null);
+        if (storedUser != null) {
+            storedUser.setStatus(Status.OFFLINE);
+            userRepository.save(storedUser);
+        }
     }
 
     public List<User> findConnectedUser(){

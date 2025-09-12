@@ -9,7 +9,6 @@
         .user-form { margin:auto; text-align:center; }
         .user-form input { display:block; margin:10px auto; padding:8px; width:200px; }
         .user-form button { padding:8px 15px; cursor:pointer; }
-
         .hidden { display:none !important; }
 
         .chat-container { flex:1; display:flex; }
@@ -37,13 +36,16 @@
         .logout:hover { text-decoration:underline; }
 
         h2.header { position:absolute; top:0; left:0; width:100%; text-align:center; background:#2563eb; color:white; margin:0; padding:10px; }
+
+        .status { margin-left: 8px; font-size: 12px; font-weight: bold; }
+        .status.online { color: green; }
+        .status.offline { color: gray; }
     </style>
 </head>
 <body>
 
 <h2 class="header">One to One Chat | Spring Boot & WebSocket</h2>
 
-<!-- Login Form -->
 <div class="user-form" id="username-page">
     <h2>Enter Chatroom</h2>
     <form id="usernameForm">
@@ -55,11 +57,10 @@
     </form>
 </div>
 
-<!-- Chat Page -->
 <div class="chat-container hidden" id="chat-page">
     <div class="users-list">
         <div class="users-list-container">
-            <h2>Online Users</h2>
+            <h2>Users</h2>
             <ul id="connectedUsers"></ul>
         </div>
         <div>
@@ -98,7 +99,6 @@
     let fullname = null;
     let selectedUserId = null;
 
-    // Connect to WebSocket
     function connect(event) {
         nickname = document.querySelector('#nickname').value.trim();
         fullname = document.querySelector('#fullname').value.trim();
@@ -115,58 +115,55 @@
     }
 
     function onConnected() {
-        // Subscribe to personal and public messages
         stompClient.subscribe(`/user/${nickname}/queue/messages`, onMessageReceived);
         stompClient.subscribe(`/user/public`, onMessageReceived);
 
-        // Notify server about new user
-        stompClient.send("/app/user.addUser", {}, JSON.stringify({nickname: nickname, fullName: fullname, status: 'ONLINE'}));
-
+        stompClient.send("/app/user.addUser", {}, JSON.stringify({nickname, fullName: fullname, status: 'ONLINE'}));
         document.querySelector('#connected-user-fullname').textContent = fullname;
-        findAndDisplayConnectedUsers();
+
+        fetchUsers();
     }
 
-    // Fetch connected users
-    async function findAndDisplayConnectedUsers() {
+    async function fetchUsers() {
         const response = await fetch('/users');
-        let connectedUsers = await response.json();
-        connectedUsers = connectedUsers.filter(user => user.nickname !== nickname);
+        let users = await response.json();
+        users = users.filter(user => user.nickname !== nickname);
 
         const list = document.getElementById('connectedUsers');
         list.innerHTML = '';
 
-        connectedUsers.forEach((user, index) => {
-            const li = document.createElement('li');
-            li.classList.add('user-item');
-            li.id = user.nickname;
-
-            const img = document.createElement('img');
-            img.src = '../img/user_icon.png';
-            img.alt = user.fullName;
-
-            const spanName = document.createElement('span');
-            spanName.textContent = user.fullName;
-
-            const nbrMsg = document.createElement('span');
-            nbrMsg.textContent = '0';
-            nbrMsg.classList.add('nbr-msg', 'hidden');
-
-            li.appendChild(img);
-            li.appendChild(spanName);
-            li.appendChild(nbrMsg);
-
-            li.addEventListener('click', userItemClick);
-            list.appendChild(li);
-
-            if (index < connectedUsers.length - 1) {
-                const separator = document.createElement('li');
-                separator.classList.add('separator');
-                list.appendChild(separator);
-            }
-        });
+        users.forEach(user => addUserToList(user));
     }
 
-    // Click on user to chat
+    function addUserToList(user) {
+        const li = document.createElement('li');
+        li.classList.add('user-item');
+        li.id = user.nickname;
+
+        const img = document.createElement('img');
+        img.src = '../img/user_icon.png';
+        img.alt = user.fullName;
+
+        const spanName = document.createElement('span');
+        spanName.textContent = user.fullName;
+
+        const statusSpan = document.createElement('span');
+        statusSpan.classList.add('status', user.status === "ONLINE" ? 'online' : 'offline');
+        statusSpan.textContent = user.status === "ONLINE" ? "● Online" : "● Offline";
+
+        const nbrMsg = document.createElement('span');
+        nbrMsg.textContent = '0';
+        nbrMsg.classList.add('nbr-msg', 'hidden');
+
+        li.appendChild(img);
+        li.appendChild(spanName);
+        li.appendChild(statusSpan);
+        li.appendChild(nbrMsg);
+
+        li.addEventListener('click', userItemClick);
+        document.getElementById('connectedUsers').appendChild(li);
+    }
+
     function userItemClick(event) {
         document.querySelectorAll('.user-item').forEach(item => item.classList.remove('active'));
         messageForm.classList.remove('hidden');
@@ -181,12 +178,9 @@
         nbrMsg.textContent = '0';
     }
 
-    // Display chat messages
     function displayMessage(senderId, content) {
         const messageContainer = document.createElement('div');
-        messageContainer.classList.add('message');
-        if (senderId === nickname) messageContainer.classList.add('sender');
-        else messageContainer.classList.add('receiver');
+        messageContainer.classList.add('message', senderId === nickname ? 'sender' : 'receiver');
 
         const p = document.createElement('p');
         p.textContent = content;
@@ -195,36 +189,50 @@
         chatArea.scrollTop = chatArea.scrollHeight;
     }
 
-    // Fetch chat history
     async function fetchAndDisplayUserChat() {
-        const response = await fetch(`/messages/${nickname}/${selectedUserId}`);
+        const response = await fetch(`/message/${nickname}/${selectedUserId}`);
         const messages = await response.json();
         chatArea.innerHTML = '';
         messages.forEach(msg => displayMessage(msg.senderId, msg.content));
     }
 
-    // Receive messages
     function onMessageReceived(payload) {
         const message = JSON.parse(payload.body);
-        findAndDisplayConnectedUsers();
 
-        if (selectedUserId && selectedUserId === message.senderId) {
-            displayMessage(message.senderId, message.content);
-        } else {
-            const notifiedUser = document.querySelector(`#${message.senderId}`);
-            if (notifiedUser) {
-                const nbrMsg = notifiedUser.querySelector('.nbr-msg');
-                nbrMsg.classList.remove('hidden');
-                nbrMsg.textContent = '1';
+        if (message.senderId && message.content) {
+            // Сообщение пришло от другого пользователя
+            if (selectedUserId && selectedUserId === message.senderId) {
+                displayMessage(message.senderId, message.content);
+            } else {
+                const notifiedUser = document.querySelector(`#${message.senderId}`);
+                if (notifiedUser) {
+                    const nbrMsg = notifiedUser.querySelector('.nbr-msg');
+                    nbrMsg.classList.remove('hidden');
+                    nbrMsg.textContent = '1';
+                }
             }
+        } else if (message.nickname && message.status) {
+            // Обновление статуса пользователя
+            updateUserStatus(message);
         }
     }
 
-    // Send message
+    function updateUserStatus(user) {
+        const li = document.getElementById(user.nickname);
+        if (li) {
+            const statusSpan = li.querySelector('.status');
+            statusSpan.textContent = user.status === "ONLINE" ? "● Online" : "● Offline";
+            statusSpan.classList.remove('online', 'offline');
+            statusSpan.classList.add(user.status === "ONLINE" ? 'online' : 'offline');
+        } else {
+            addUserToList(user);
+        }
+    }
+
     function sendMessage(event) {
         const content = messageInput.value.trim();
         if (content && stompClient) {
-            const chatMessage = {senderId: nickname, recipientId: selectedUserId, content: content, timestamp: new Date()};
+            const chatMessage = {senderId: nickname, recipientId: selectedUserId, content, timestamp: new Date()};
             stompClient.send("/app/chat", {}, JSON.stringify(chatMessage));
             displayMessage(nickname, content);
             messageInput.value = '';
@@ -232,9 +240,8 @@
         event.preventDefault();
     }
 
-    // Logout
     function onLogout() {
-        stompClient.send("/app/user.disconnectUser", {}, JSON.stringify({nickname: nickname, fullName: fullname, status: 'OFFLINE'}));
+        stompClient.send("/app/user.disconnectUser", {}, JSON.stringify({nickname, fullName: fullname, status: 'OFFLINE'}));
         window.location.reload();
     }
 
@@ -247,6 +254,5 @@
         alert('Could not connect to WebSocket server. Please refresh the page!');
     }
 </script>
-
 </body>
 </html>

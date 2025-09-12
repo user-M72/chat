@@ -1,21 +1,18 @@
 package com.example.WebSocket.entity;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.Setter;
-import jakarta.persistence.Id;
 
-@Entity(name = "chat_message")
-@Getter
-@Setter
+import lombok.Builder;
+import lombok.Data;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+
+@Data
 @Builder
+@Document(collection = "chat_message")
 public class ChatMessage{
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private String id;
     private String chatId;
     private String senderId;
     private String recipientId;

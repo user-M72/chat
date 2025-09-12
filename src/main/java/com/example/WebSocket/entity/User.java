@@ -1,20 +1,20 @@
 package com.example.WebSocket.entity;
 
-import jakarta.persistence.*;
+
 import lombok.Getter;
 import lombok.Setter;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
 
-@Entity(name = "users")
+@Document(collection = "users")
 @Getter
 @Setter
 public class User {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
     private String nickname;
     private String fullName;
-
-    @Enumerated(EnumType.STRING)
     private Status status;
+
+
 }

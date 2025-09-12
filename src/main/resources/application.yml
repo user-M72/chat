@@ -2,19 +2,9 @@ spring:
   application:
   name: WebSocket
 
-  datasource:
-    url: jdbc:postgresql://localhost:5432/chatDb
-    username: postgres
-    password: 01032002ama
-    driver-class-name: org.postgresql.Driver
-
-  jpa:
-    hibernate:
-      # PAY ATTENTION, BE CAUTIOUS!!!
-      ddl-auto: update
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
+  data:
+    mongodb:
+      uri: mongodb+srv://username:username@cluster0.pt3uyit.mongodb.net/chatDb?retryWrites=true&w=majority&appName=Cluster0
 
 server:
   port: 8080

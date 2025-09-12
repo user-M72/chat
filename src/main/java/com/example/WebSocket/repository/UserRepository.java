@@ -2,13 +2,10 @@ package com.example.WebSocket.repository;
 
 import com.example.WebSocket.entity.Status;
 import com.example.WebSocket.entity.User;
-import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.mongodb.repository.MongoRepository;
 
 import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
 
-public interface UserRepository extends JpaRepository<User, Long> {
+public interface UserRepository extends MongoRepository<User, String> {
     List<User> findAllByStatus(Status status);
-    Optional<User> findByNickname(String nickname);
 }

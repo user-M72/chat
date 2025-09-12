@@ -1,11 +1,10 @@
 package com.example.WebSocket.repository;
 
 import com.example.WebSocket.entity.ChatRoom;
-import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.mongodb.repository.MongoRepository;
 
 import java.util.Optional;
-import java.util.UUID;
 
-public interface ChatRoomRepository extends JpaRepository<ChatRoom, Long> {
+public interface ChatRoomRepository extends MongoRepository<ChatRoom, String> {
     Optional<ChatRoom> findBySenderIdAndRecipientId(String senderId, String recipientId);
 }
