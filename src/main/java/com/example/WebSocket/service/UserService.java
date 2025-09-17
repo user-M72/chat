@@ -30,4 +30,8 @@ public class UserService {
     public List<User> findConnectedUser(){
         return userRepository.findAllByStatus(Status.ONLINE);
     }
+
+    public List<User> findAllUser(){
+        return userRepository.findAll();
+    }
 }
