@@ -21,7 +21,7 @@ public class ChatMessageService {
     @Autowired private MongoOperations mongoOperations;
 
     public ChatMessage save(ChatMessage chatMessage){
-        chatMessage.setStatus(StatusMessage.RECEIVED);
+        chatMessage.setStatusMessage(StatusMessage.RECEIVED);
         chatMessageRepository.save(chatMessage);
         return chatMessage;
     }
@@ -36,7 +36,7 @@ public class ChatMessageService {
     }
 
     public long countNewMessages(String senderId, String recipientId) {
-        return chatMessageRepository.countBySenderIdAndRecipientIdAndStatus(
+        return chatMessageRepository.countBySenderIdAndRecipientIdAndStatusMessage(
                 senderId, recipientId, StatusMessage.RECEIVED);
     }
 
@@ -44,7 +44,7 @@ public class ChatMessageService {
         return chatMessageRepository
                 .findById(id)
                 .map(chatMessage -> {
-                    chatMessage.setStatus(StatusMessage.DELIVERED);
+                    chatMessage.setStatusMessage(StatusMessage.DELIVERED);
                     return chatMessageRepository.save(chatMessage);
                 }).orElseThrow(() -> new RuntimeException("can`t find message (" + id + ")"));
     }

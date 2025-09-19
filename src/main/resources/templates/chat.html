@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chat Application</title>
     <style>
+        /* Ваши стили остаются без изменений */
         body { font-family: Arial, sans-serif; margin:0; height:100vh; display:flex; }
         .user-form { margin:auto; text-align:center; }
         .user-form input { display:block; margin:10px auto; padding:8px; width:200px; }
@@ -103,34 +104,59 @@
 
             const socket = new SockJS('/ws');
             stompClient = Stomp.over(socket);
-            stompClient.connect({}, onConnected, onError);
+
+            // Добавляем headers с данными пользователя
+            const headers = {
+                nickname: nickname,
+                fullname: fullname
+            };
+
+            stompClient.connect(headers, onConnected, onError);
         }
         event.preventDefault();
     }
 
     function onConnected() {
-    stompClient.subscribe('/user/queue/messages', onMessageReceived);
-    stompClient.subscribe('/topic/public', onMessageReceived);
+        console.log('Connected to WebSocket');
 
-    stompClient.send("/app/user.addUser", {}, JSON.stringify({
-        nickname,
-        fullName: fullname,
-        status: 'ONLINE'
-    }));
-    document.querySelector('#connected-user-fullname').textContent = fullname;
+        // Правильные подписки:
+        // 1. Для личных сообщений
+        stompClient.subscribe('/user/queue/messages', onChatMessageReceived);
 
-    fetchUsers();
-}
+        // 2. Для статусов пользователей
+        stompClient.subscribe('/topic/public', onStatusMessageReceived);
+
+        // Регистрируем пользователя
+        stompClient.send("/app/user.addUser", {}, JSON.stringify({
+            nickname: nickname,
+            fullName: fullname,
+            status: 'ONLINE'
+        }));
+
+        document.querySelector('#connected-user-fullname').textContent = fullname;
+        fetchUsers();
+    }
 
     async function fetchUsers() {
-        const response = await fetch('/users');
-        const users = await response.json();
-        const list = document.getElementById('connectedUsers');
-        list.innerHTML = '';
+        try {
+            const response = await fetch('/users');
+            if (!response.ok) throw new Error('Failed to fetch users');
+            const users = await response.json();
+            const list = document.getElementById('connectedUsers');
+            list.innerHTML = '';
 
-        users.forEach(user => {
-            if(user.nickname !== nickname) addUserToList(user);
-        });
+            users.forEach(user => {
+                if(user.nickname !== nickname) addUserToList(user);
+            });
+
+            // Автоматически выбираем первого пользователя
+            const firstUser = list.querySelector('li');
+            if (firstUser) {
+                firstUser.click();
+            }
+        } catch (error) {
+            console.error('Error fetching users:', error);
+        }
     }
 
     function addUserToList(user) {
@@ -139,10 +165,14 @@
         const li = document.createElement('li');
         li.classList.add('user-item');
         li.id = user.nickname;
+        li.dataset.userId = user.nickname;
 
         const img = document.createElement('img');
         img.src = '../img/user_icon.png';
         img.alt = user.fullName;
+        img.onerror = function() {
+            this.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwYXRoIGQ9Ik0yMCAyMXYtMmE0IDQgMCAwIDAtNC00SDhhNCA0IDAgMCAwLTQgNHYyIj48L3BhdGg+PGNpcmNsZSBjeD0iMTIiIGN5PSI3IiByPSI0Ij48L2NpcmNsZT48L3N2Zz4=';
+        };
 
         const spanName = document.createElement('span');
         spanName.textContent = user.fullName;
@@ -171,50 +201,86 @@
         const clicked = event.currentTarget;
         clicked.classList.add('active');
         selectedUserId = clicked.id;
-        fetchAndDisplayUserChat();
 
+        // Сбрасываем счетчик сообщений
         const nbrMsg = clicked.querySelector('.nbr-msg');
         nbrMsg.classList.add('hidden');
         nbrMsg.textContent = '0';
+
+        fetchAndDisplayUserChat();
     }
 
-    function displayMessage(senderId, content) {
+    function displayMessage(senderId, content, timestamp = null) {
         const messageContainer = document.createElement('div');
         messageContainer.classList.add('message', senderId === nickname ? 'sender' : 'receiver');
 
-        const p = document.createElement('p');
-        p.textContent = content;
-        messageContainer.appendChild(p);
+        const messageText = document.createElement('p');
+        messageText.textContent = content;
+        messageContainer.appendChild(messageText);
+
+        if (timestamp) {
+            const timeSpan = document.createElement('span');
+            timeSpan.style.fontSize = '10px';
+            timeSpan.style.color = '#666';
+            timeSpan.style.marginLeft = '10px';
+            timeSpan.textContent = new Date(timestamp).toLocaleTimeString();
+            messageText.appendChild(timeSpan);
+        }
+
         chatArea.appendChild(messageContainer);
         chatArea.scrollTop = chatArea.scrollHeight;
     }
 
     async function fetchAndDisplayUserChat() {
         if(!selectedUserId) return;
-        const response = await fetch(`/message/${nickname}/${selectedUserId}`);
-        const messages = await response.json();
-        chatArea.innerHTML = '';
-        messages.forEach(msg => displayMessage(msg.senderId, msg.content));
+        try {
+            const response = await fetch(`/messages/${nickname}/${selectedUserId}`);
+            if (!response.ok) throw new Error('Failed to fetch messages');
+            const messages = await response.json();
+            chatArea.innerHTML = '';
+            messages.forEach(msg => displayMessage(msg.senderId, msg.content, msg.timestamp));
+        } catch (error) {
+            console.error('Error fetching messages:', error);
+        }
     }
 
-    function onMessageReceived(payload) {
-        const message = JSON.parse(payload.body);
+    function onChatMessageReceived(payload) {
+        try {
+            console.log('Chat message received:', payload.body);
+            const message = JSON.parse(payload.body);
 
-        if (message.senderId && message.content) {
-            if (selectedUserId &&
-               (selectedUserId === message.senderId || selectedUserId === message.recipientId)) {
-                displayMessage(message.senderId, message.content);
-            } else {
-                const userId = (message.senderId === nickname) ? message.recipientId : message.senderId;
-                const notifiedUser = document.querySelector(`#${userId}`);
-                if (notifiedUser) {
-                    const nbrMsg = notifiedUser.querySelector('.nbr-msg');
-                    nbrMsg.classList.remove('hidden');
-                    nbrMsg.textContent = parseInt(nbrMsg.textContent) + 1;
+            if (message.senderId && message.content) {
+                console.log('Processing message from:', message.senderId, 'to:', message.recipientId);
+
+                if (selectedUserId === message.senderId) {
+                    // Если открыт чат с отправителем - показываем сообщение
+                    displayMessage(message.senderId, message.content, message.timestamp);
+                } else {
+                    // Если чат не открыт - показываем уведомление
+                    const notifiedUser = document.querySelector(`[data-user-id="${message.senderId}"]`);
+                    if (notifiedUser) {
+                        const nbrMsg = notifiedUser.querySelector('.nbr-msg');
+                        nbrMsg.classList.remove('hidden');
+                        nbrMsg.textContent = (parseInt(nbrMsg.textContent || '0') + 1).toString();
+                        playNotificationSound();
+                    }
                 }
             }
-        } else if (message.nickname && message.status) {
-            updateUserStatus(message);
+        } catch (error) {
+            console.error('Error processing chat message:', error);
+        }
+    }
+
+    function onStatusMessageReceived(payload) {
+        try {
+            console.log('Status message received:', payload.body);
+            const userStatus = JSON.parse(payload.body);
+
+            if (userStatus.nickname && userStatus.status) {
+                updateUserStatus(userStatus);
+            }
+        } catch (error) {
+            console.error('Error processing status message:', error);
         }
     }
 
@@ -223,37 +289,65 @@
         if (li) {
             const statusSpan = li.querySelector('.status');
             statusSpan.textContent = user.status === "ONLINE" ? "● Online" : "● Offline";
-            statusSpan.classList.remove('online', 'offline');
-            statusSpan.classList.add(user.status === "ONLINE" ? 'online' : 'offline');
-        } else {
+            statusSpan.className = 'status ' + (user.status === "ONLINE" ? 'online' : 'offline');
+        } else if (user.nickname !== nickname) {
             addUserToList(user);
         }
     }
 
     function sendMessage(event) {
+        event.preventDefault();
         const content = messageInput.value.trim();
         if (content && stompClient && selectedUserId) {
-            const chatMessage = {senderId: nickname, recipientId: selectedUserId, content, timestamp: new Date()};
+            const chatMessage = {
+                senderId: nickname,
+                recipientId: selectedUserId,
+                content: content,
+                timestamp: new Date().toISOString()
+            };
+
+            console.log('Sending message:', chatMessage);
             stompClient.send("/app/chat", {}, JSON.stringify(chatMessage));
-            displayMessage(nickname, content);
+            displayMessage(nickname, content, new Date());
             messageInput.value = '';
         }
-        event.preventDefault();
+    }
+
+    function playNotificationSound() {
+        // Простая реализация звукового уведомления
+        try {
+            const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbVtfdJivrJBhNjVgodDbq2EcBStxtvLInFEEABZvufDguIIiAAAQYcDp4siJPwAACFq25+TNkkgEAAhQq+Dp1KBTCAAISaTd59egWgwACEKf2+ndqV0OAAg9m93q3qpfEAAGOJfa6N6qYA8ABjOT2OfdqV8PAAYvkNfm3algEAAGLIzV5dypYBAABimJ0+TcqGAQAAYnh9Hj26dfDwAGJYTP4tunXw8ABiOCzeHap18PAAYhgMzg2qZfDwAGIH3K3tmmXg8ABh57yN3YpV4PAAYdecbb16ReDwAGG3bE2tajXQ8ABhlzw9nVol0PAAYYccLY1KJdDwAGF2/A19ShXQ8ABhZtv9bToF0PAAYUa77V0qBdDwAGEmq91NKgXQ8ABhFovNPRn10PAAYPZrvS0J9dDwAGDWW60dCfXQ8ABgtjuNDPn10PAAYJYbjPz59dDwAGCGC3z8+fXQ8ABgZets7On10PAAYEXbXNzp9dDwAGAlu0zM2fXQ8ABgFas8vMn10PAAUAWbLKzJ9dDwA=');
+            audio.play().catch(e => console.log('Audio play failed:', e));
+        } catch (error) {
+            console.log('Notification sound not available');
+        }
     }
 
     function onLogout() {
-        stompClient.send("/app/user.disconnectUser", {}, JSON.stringify({nickname, fullName: fullname, status: 'OFFLINE'}));
+        if (stompClient && stompClient.connected) {
+            stompClient.send("/app/user.disconnectUser", {}, JSON.stringify({
+                nickname: nickname,
+                fullName: fullname,
+                status: 'OFFLINE'
+            }));
+        }
         window.location.reload();
     }
 
+    function onError(error) {
+        console.error('WebSocket error:', error);
+        alert('Could not connect to WebSocket server. Please refresh the page!');
+    }
+
+    // Добавляем обработчики событий
     usernameForm.addEventListener('submit', connect, true);
     messageForm.addEventListener('submit', sendMessage, true);
     logout.addEventListener('click', onLogout, true);
-    window.onbeforeunload = () => onLogout();
 
-    function onError() {
-        alert('Could not connect to WebSocket server. Please refresh the page!');
-    }
+    // Обработчик закрытия страницы
+    window.addEventListener('beforeunload', onLogout);
+
+    console.log('Chat application loaded');
 </script>
 </body>
 </html>

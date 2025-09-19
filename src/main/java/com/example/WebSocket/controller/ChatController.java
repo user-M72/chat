@@ -36,7 +36,8 @@ public class ChatController {
                         saveMsg.getId(),
                         saveMsg.getSenderId(),
                         saveMsg.getRecipientId(),
-                        saveMsg.getContent()
+                        saveMsg.getContent(),
+                        saveMsg.getTimestamp()
                 )
         );
     }
