@@ -18,4 +18,7 @@ public class ChatMessage{
     private String recipientId;
     private String content;
     private String timestamp;
+
+    public void setStatus(StatusMessage received) {
+    }
 }

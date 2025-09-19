@@ -109,14 +109,18 @@
     }
 
     function onConnected() {
-        stompClient.subscribe(`/user/${nickname}/queue/messages`, onMessageReceived);
-        stompClient.subscribe(`/topic/public`, onMessageReceived);
+    stompClient.subscribe('/user/queue/messages', onMessageReceived);
+    stompClient.subscribe('/topic/public', onMessageReceived);
 
-        stompClient.send("/app/user.addUser", {}, JSON.stringify({nickname, fullName: fullname, status: 'ONLINE'}));
-        document.querySelector('#connected-user-fullname').textContent = fullname;
+    stompClient.send("/app/user.addUser", {}, JSON.stringify({
+        nickname,
+        fullName: fullname,
+        status: 'ONLINE'
+    }));
+    document.querySelector('#connected-user-fullname').textContent = fullname;
 
-        fetchUsers();
-    }
+    fetchUsers();
+}
 
     async function fetchUsers() {
         const response = await fetch('/users');
